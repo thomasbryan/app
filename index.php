@@ -42,8 +42,10 @@ class app {
         }
       }
     }else{
-      if(is_writable(dirname('..'))) {
-        echo 'install logic'; exit();
+      if(is_writable(dirname('..'))) { 
+        if($this->req) {
+          //validate input
+        } ?><!DOCTYPE html><html><head><title>App</title><style>body{font-family:arial;}div{margin-bottom:1em;clear:both;float:right;}form{margin:auto;width:400px;}label{font-weight:bold;padding-right:2em;}input,button{padding:6px 12px;color:#555;background-color:#fff;background-image:none;border:1px solid #ccc;border-radius:4px;box-shadow:inset 0 1px 1px rgba(0,0,0,.075);box-sizing:border-box;}button{background:#0063ce;color:#fff;font-weight:bold;width:195px;}</style></head><body><form method="POST"><div><label>Provider URL</label><input type="url" name="auth" required /></div><div><label>Callback URL</label><input type="url" name="url" value="<?= $this->callback(); ?>" required /></div><div><label>Client ID</label><input type="text" name="id" required /></div><div><label>Client Secret</label><input type="text" name="secret" required /></div><div><label>Scope</label><input type="text" name="scopes" required /></div><div><label>Database Name</label><input type="text" name="name" required /></div><div><label>User Name</label><input type="text" name="user" required /></div><div><label>Password</label><input type="text" name="pass" required /></div><div><label>Database Host</label><input type="text" name="host" required /></div><div><label>Encryption Key</label><input type="text" name="key" required /></div><div><button type="submit">Install Application</button></div></form></body></html><?php
       }else{
         echo 'Unable to write configuration file';exit();
       }
