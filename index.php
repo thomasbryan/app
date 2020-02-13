@@ -42,6 +42,7 @@ class app {
               setcookie('state','',0,'/');
               exit('State value does not match the one initially sent');
             }
+            //http()
             $data = [
               'grant_type' => 'authorization_code',
               'client_id' => $this->e['id'],
@@ -66,22 +67,30 @@ class app {
                 $payload = base64_decode($shrapnel[1]);
                 $claim = json_decode($payload);
                 if(!empty($claim)) {
-                  print_R($claim); exit();
-                  //email?
-                  //name?
-                  $users = false;
-                  //select users where 
-                  if($users) {
-                    //$sub = ..
-                  }else{
-                    //insert into users
+                  $email = $claim->email;
+                  $name = $claim->name;
+                  $users = $this->query('select user from users where email = ? limit 1',[$email]);
+                  if(isset($users['res'])) {
+                    $sub = false;
+                    if(count($users['res']) == 1) {
+                      $sub = $users['res'][0]['user'];
+                    }else{
+                      //revise
+                      $new = $this->query('insert into `users` (user,email,name) values (uuid(),?,?)',[$email,$name]);
+                      $u = $this->query('select user from users where email = ? limit 1',[$email]);
+                      if(count($u['res']) == 1) {
+                        $sub = $u['res'][0]['user'];
+                      }
+                    }
+                    if($sub) {
+                      $exp = time() + 86400;
+                      $who = base64_encode(json_encode(['exp'=>$exp,'sub'=>$sub]));
+                      setcookie('app',$who.'.'.base64_encode(hash_hmac('sha256',$who,$this->e['encryption'])),$exp,'/');
+                      setcookie('state','',0,'/');
+                      header('Location: '.$this->e['url']);
+                      exit();
+                    }
                   }
-                  $exp = time() + 86400;
-                  $who = base64_encode(json_encode(['exp'=>$exp,'sub'=>$sub]));
-                  setcookie('app',$who.'.'.base64_encode(hash_hmac('sha256',$who,$this->e['encrypt'])),$exp,'/');
-                  setcookie('state','',0,'/');
-                  header('Location: '.$this->e['url']);
-                  exit();
                 }
               }
             }
@@ -141,11 +150,21 @@ class app {
                   $this->env('pass',$pass);
                   $this->env('host',$host);
                   $this->e();
-                  $this->dsn();
-                  //install tables 
-                  //$this->env('encryption',$this->random());
-                  //header('Location: '.$this->e['url']);
-                  //exit();
+                  $this->dsn(false);
+                  $db = $this->query('CREATE DATABASE IF NOT EXISTS `'.$this->e['name'].'`');
+                  if(!isset($db['err'])) {
+                    $this->dsn();
+										$this->query('CREATE TABLE IF NOT EXISTS `users` (`user` char(36) NOT NULL,`email` varchar(255) NOT NULL,`name` varchar(100) NOT NULL,`admin` int(11) NOT NULL DEFAULT 0,PRIMARY KEY (`user`), UNIQUE KEY `users_email_unique` (`email`))');
+										$this->query('CREATE TABLE IF NOT EXISTS `roles` (`role` char(36) NOT NULL,`name` varchar(100) NOT NULL,PRIMARY KEY (`role`),UNIQUE KEY `roles_name_unique` (`name`))');
+                    $this->query('CREATE TABLE IF NOT EXISTS `perms` (`perm` char(36) NOT NULL,`name` varchar(100) NOT NULL,PRIMARY KEY (`perm`),UNIQUE KEY `perms_name_unique` (`name`))');
+										$this->query('CREATE TABLE IF NOT EXISTS `usros` (`user` char(36) NOT NULL,`role` char(36) NOT NULL,KEY `usros_user_foreign` (`user`),KEY `usros_role_foreign` (`role`),CONSTRAINT `usros_role_foreign` FOREIGN KEY (`role`) REFERENCES `roles` (`role`) ON DELETE CASCADE,CONSTRAINT `usros_user_foreign` FOREIGN KEY (`user`) REFERENCES `users` (`user`) ON DELETE CASCADE)');
+                    $this->query('CREATE TABLE IF NOT EXISTS `ropes` (`role` char(36) NOT NULL,`perm` char(36) NOT NULL,KEY `roleperm_role_foreign` (`role`),KEY `roleperm_perm_foreign` (`perm`),CONSTRAINT `roleperm_perm_foreign` FOREIGN KEY (`perm`) REFERENCES `perms` (`perm`) ON DELETE CASCADE,CONSTRAINT `roleperm_role_foreign` FOREIGN KEY (`role`) REFERENCES `roles` (`role`) ON DELETE CASCADE)');
+										$this->query('CREATE TABLE IF NOT EXISTS `meta` (`meta` char(36) NOT NULL,`method` varchar(10) NOT NULL,`first` varchar(100) NOT NULL,`last` varchar(100) NOT NULL,`name` varchar(100) NOT NULL,`type` tinyint(4) UNSIGNED NOT NULL,`read` char(36) NOT NULL,`write` char(36) NOT NULL,`datum` char(36) NOT NULL,PRIMARY KEY (`meta`))');
+										$this->query('CREATE TABLE IF NOT EXISTS `data` (`datum` char(36) NOT NULL,`meta` char(36) NOT NULL,`text` mediumtext NOT NULL,`user` char(36) NOT NULL,`stamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (`datum`))');
+                  	$this->env('encryption',$this->random());
+                  	header('Location: '.$this->e['url']);
+                  	exit();
+                  }
                 }
               }
             }
@@ -157,9 +176,8 @@ class app {
     }
   }
   //curl();
-  private function http($json,$err = false) {
-    $res = false;
-    $err = false;
+  private function http($json) {
+    $res = [];
     $req = json_decode($json);
     if(json_last_error() == JSON_ERROR_NONE) {
       if(isset($req->url)) {
@@ -174,11 +192,11 @@ class app {
         $context = stream_context_create($options);
         $res = @file_get_contents($req->url, false, $context);
         if(!$res) {
-          if($err) $this->req['err'] = base64_encode(json_encode(error_get_last()));
+          $res['err'] = base64_encode(json_encode(error_get_last()));
         }else{
           $json = json_decode($res);
           if(json_last_error() == JSON_ERROR_NONE) {
-            $res = $json;
+            $res['res'] = $json;
           }
         }
       }
@@ -223,8 +241,9 @@ class app {
   private $dsn = ''; /* Storage Connection */
   private $user = ''; /* Storage User */
   private $pass = ''; /* Storage Pass */
-  private function dsn() {
-    $this->dsn = 'mysql:'.'host='.$this->e['host'].';dbname='.$this->e['name'];
+  private function dsn($db = true) {
+    $this->dsn = 'mysql:'.'host='.$this->e['host'];
+    if($db) $this->dsn .= ';dbname='.$this->e['name'];
     $this->user = $this->e['user'];
     $this->pass = $this->e['pass'];
   }
