@@ -28,6 +28,8 @@ class app {
               //if encrpytion key rotation window then check old key
             }
             if($this->who) {
+              //controller
+              //authorization
               echo 'application logic'; exit();
             }
           }
@@ -35,7 +37,66 @@ class app {
       }
       if(!$this->who) {
         if(!$this->a) { 
-          echo 'oauth logic'; exit();
+          if(isset($_GET['code'])) {
+            if(empty($_GET['state']) || ($_GET['state'] !== $_COOKIE['state'])) {
+              setcookie('state','',0,'/');
+              exit('State value does not match the one initially sent');
+            }
+            $data = [
+              'grant_type' => 'authorization_code',
+              'client_id' => $this->e['id'],
+              'code' => $_GET['code'],
+              'redirect_uri' => $this->e['url'],
+              'client_secret' => $this->e['secret']
+            ];
+            $options = [
+              'http' => [
+                'header' => "Content-type: application/x-www-form-urlencoded\r\n",
+                'method' => 'POST',
+                'content' => http_build_query($data)
+              ]
+            ];
+            $context = stream_context_create($options);
+            $result = @file_get_contents($this->e['toke'], false, $context);
+            $json = json_decode($result);
+            //validate json
+            if(!empty($json)) {
+              if(isset($json->id_token)) {
+                $shrapnel = explode('.',$json->id_token);
+                $payload = base64_decode($shrapnel[1]);
+                $claim = json_decode($payload);
+                if(!empty($claim)) {
+                  print_R($claim); exit();
+                  //email?
+                  //name?
+                  $users = false;
+                  //select users where 
+                  if($users) {
+                    //$sub = ..
+                  }else{
+                    //insert into users
+                  }
+                  $exp = time() + 86400;
+                  $who = base64_encode(json_encode(['exp'=>$exp,'sub'=>$sub]));
+                  setcookie('app',$who.'.'.base64_encode(hash_hmac('sha256',$who,$this->e['encrypt'])),$exp,'/');
+                  setcookie('state','',0,'/');
+                  header('Location: '.$this->e['url']);
+                  exit();
+                }
+              }
+            }
+            //http_response_code(401);
+            exit('Unable to process this request');
+          }else{
+            if(isset($_COOKIE['state'])) {
+              $state = $_COOKIE['state'];
+            }else{
+              $state = $this->random(32);
+              setcookie('state',$state,time()+86400,'/');
+            }
+            header('Location: '.$this->e['rize'].'?state='.$state.'&scope='.$this->e['scopes'].'&response_type=code&client_id='.$this->e['id'].'&redirect_uri='.$this->e['url']);
+            exit();
+          }
         }else{
           http_response_code(401);
           exit();
@@ -43,9 +104,53 @@ class app {
       }
     }else{
       if(is_writable(dirname('..'))) { 
+        $auth = $url = $id = $secret = $scopes = $name = $user = $pass = $host = $key = '';
         if($this->req) {
-          //validate input
-        } ?><!DOCTYPE html><html><head><title>App</title><style>body{font-family:arial;}div{margin-bottom:1em;clear:both;float:right;}form{margin:auto;width:400px;}label{font-weight:bold;padding-right:2em;}input,button{padding:6px 12px;color:#555;background-color:#fff;background-image:none;border:1px solid #ccc;border-radius:4px;box-shadow:inset 0 1px 1px rgba(0,0,0,.075);box-sizing:border-box;}button{background:#0063ce;color:#fff;font-weight:bold;width:195px;}</style></head><body><form method="POST"><div><label>Provider URL</label><input type="url" name="auth" required /></div><div><label>Callback URL</label><input type="url" name="url" value="<?= $this->callback(); ?>" required /></div><div><label>Client ID</label><input type="text" name="id" required /></div><div><label>Client Secret</label><input type="text" name="secret" required /></div><div><label>Scope</label><input type="text" name="scopes" required /></div><div><label>Database Name</label><input type="text" name="name" required /></div><div><label>User Name</label><input type="text" name="user" required /></div><div><label>Password</label><input type="text" name="pass" required /></div><div><label>Database Host</label><input type="text" name="host" required /></div><div><label>Encryption Key</label><input type="text" name="key" required /></div><div><button type="submit">Install Application</button></div></form></body></html><?php
+          if(isset($this->req['auth'])) $auth = $this->req['auth'];
+          if(isset($this->req['url'])) $url = $this->req['url'];
+          if(isset($this->req['id'])) $id = $this->req['id'];
+          if(isset($this->req['secret'])) $secret = $this->req['secret'];
+          if(isset($this->req['scopes'])) $scopes = $this->req['scopes'];
+          if(isset($this->req['name'])) $name = $this->req['name'];
+          if(isset($this->req['user'])) $user = $this->req['user'];
+          if(isset($this->req['pass'])) $pass = $this->req['pass'];
+          if(isset($this->req['host'])) $host = $this->req['host'];
+          if(isset($this->req['key'])) $key = $this->req['key'];
+          if(!empty($auth)&&!empty($url)&&!empty($id)&&!empty($secret)&&!empty($scopes)&&!empty($name)&&!empty($user)&&!empty($pass)&&!empty($host)&&!empty($key)) {
+            $rize = $toke = false;
+            $json = json_decode(@file_get_contents($auth.'/.well-known/openid-configuration'));
+            if(!empty($json)) {
+              if(isset($json->authorization_endpoint)) {
+                $rize = $json->authorization_endpoint;
+              }
+              if(isset($json->token_endpoint)) {
+                $toke = $json->token_endpoint;
+              }
+              if($rize && $toke) {
+                if(in_array('code',$json->response_types_supported)&&in_array('email',$json->claims_supported)&&in_array('name',$json->claims_supported)) {
+                  touch('../.env');
+                  $this->env('auth',$auth);
+                  $this->env('url',$url);
+                  $this->env('id',$id);
+                  $this->env('secret',$secret);
+                  $this->env('scopes',$scopes);
+                  $this->env('rize',$rize);
+                  $this->env('toke',$toke);
+                  $this->env('name',$name);
+                  $this->env('user',$user);
+                  $this->env('pass',$pass);
+                  $this->env('host',$host);
+                  $this->e();
+                  $this->dsn();
+                  //install tables 
+                  //$this->env('encryption',$this->random());
+                  //header('Location: '.$this->e['url']);
+                  //exit();
+                }
+              }
+            }
+          }
+        } if(empty($url)) $url = $this->callback(); ?><!DOCTYPE html><html><head><title>App</title><style>body{font-family:arial;}div{margin-bottom:1em;clear:both;float:right;}form{margin:auto;width:400px;}label{font-weight:bold;padding-right:2em;}input,button{padding:6px 12px;color:#555;background-color:#fff;background-image:none;border:1px solid #ccc;border-radius:4px;box-shadow:inset 0 1px 1px rgba(0,0,0,.075);box-sizing:border-box;}button{background:#0063ce;color:#fff;font-weight:bold;width:195px;}</style></head><body><form method="POST"><div><label>Provider URL</label><input type="url" name="auth" value="<?= $auth ?>" required /></div><div><label>Callback URL</label><input type="url" name="url" value="<?= $url ?>" required /></div><div><label>Client ID</label><input type="text" name="id" value="<?= $id ?>" required /></div><div><label>Client Secret</label><input type="text" name="secret" value="<?= $secret ?>" required /></div><div><label>Scope</label><input type="text" name="scopes" value="<?= $scopes ?>" required /></div><div><label>Database Name</label><input type="text" name="name" value="<?= $name ?>" required /></div><div><label>User Name</label><input type="text" name="user" value="<?= $user ?>" required /></div><div><label>Password</label><input type="text" name="pass" value="<?= $pass ?>" required /></div><div><label>Database Host</label><input type="text" name="host" value="<?= $host ?>" required /></div><div><label>Encryption Key</label><input type="text" name="key" value="<?= $key ?>" required /></div><div><button type="submit">Install Application</button></div></form></body></html><?php
       }else{
         echo 'Unable to write configuration file';exit();
       }
@@ -87,27 +192,27 @@ class app {
     //more comprehensive return status. 
   }
   private function query($query = '', $execute = []) {
+    $res = [];
     try {
       $db = new PDO($this->dsn,$this->user,$this->pass);
     } catch (PDOException $e) {
-      $log = 'Connection failed: '.$e->getMessage();
-      $this->lumberjack($log,'error');
-      //echo $log;
-      return false;
+      $res['err'] = $e->getMessage();
+      return $res;
     }
-    #$this->lumberjack(array('q'=>$query,'t'=>$tenant),'info');
     $statement = $db->prepare($query);
     try {
       $statement->execute($execute);
     } catch(PDOException $e) {
-      $log = 'Statement failed: '.$e->getMessage();
-      $this->lumberjack($log,'error');
-      //echo $log;
-      return false;
+      $res['err'] = $e->getMessage();
+      return $res;
     }
     $last = $db->lastInsertId();
-    if($last) return $last;
-    return $statement->fetchAll(PDO::FETCH_ASSOC);
+    if($last) {
+      $res['id'] = $last;
+    }else{
+      $res['res'] = $statement->fetchAll(PDO::FETCH_ASSOC);
+    }
+    return $res;
   }
   private $a = false; /* AJAX request */
   private $e = false; /* ENV variables */
@@ -119,11 +224,12 @@ class app {
   private $user = ''; /* Storage User */
   private $pass = ''; /* Storage Pass */
   private function dsn() {
-    $this->dsn = $this->e['db'].':'.'host='.$this->e['host'].';dbname='.$this->e['name'];
+    $this->dsn = 'mysql:'.'host='.$this->e['host'].';dbname='.$this->e['name'];
     $this->user = $this->e['user'];
     $this->pass = $this->e['pass'];
   }
   private function callback() {
+    return 'http'.((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS']!='off')?'s':'').'://'.$_SERVER['HTTP_HOST'];
     $callback = 'http'.(isset($_SERVER['HTTPS']) ? 's':'' ).'://'.$_SERVER['HTTP_HOST'];
     /* todo random get param / more logic
     if(!isset($_GET['uri'])) {
@@ -150,17 +256,6 @@ class app {
     }
     return $res;
   }
-  private function token($user,$name) {
-    $json = [
-      'Expr' => date('U',strtotime('+1 day')),
-      'Name' => $name,
-      'User' => $user,
-    ];
-    $this->who = (object) $json;
-    $claim = base64_encode(json_encode($json));
-    $encrypt = $this->e['encryption'];
-    setcookie('index',$claim.'.'.base64_encode(hash_hmac('sha256',$claim,$encrypt)), time() + 86400,'/');
-  }
   private function utf8ize($d) {
     if(is_array($d)) {
       foreach($d as $k => $v) {
@@ -178,8 +273,12 @@ class app {
   private function env($k,$v) {
     $env = '../.env';
     $str = file_get_contents($env);
-    $old = $this->e[$k];
-    $str = str_replace("{$k}={$old}\n", "{$k}={$v}\n", $str);
+    if(isset($this->e[$k])) {
+      $old = $this->e[$k];
+      $str = str_replace("{$k}={$old}\n", "{$k}={$v}\n", $str);
+    }else{
+      $str .= "{$k}={$v}\n";
+    }
     $fp = fopen($env, 'w');
     fwrite($fp, $str);
     fclose($fp);
