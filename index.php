@@ -10,8 +10,7 @@ class app {
     $this->debug();
     date_default_timezone_set('America/Chicago');
     if(isset($_SERVER['HTTP_X_REQUESTED_WITH'])) { if($_SERVER['HTTP_X_REQUESTED_WITH']=='XMLHttpRequest') { $this->a = true; } }
-    $this->u = explode('/',$_SERVER['REQUEST_URI']);
-    $this->u[count($this->u)-1] = strtok(end($this->u),'?');
+    $this->u = explode('/',strtok($_SERVER['REQUEST_URI'],'?'));
     parse_str(file_get_contents("php://input"), $this->req);
     $this->e();
     if(!empty($this->e['encryption'])) {
@@ -28,9 +27,45 @@ class app {
               //if encrpytion key rotation window then check old key
             }
             if($this->who) {
-              //controller
-              //authorization
-              echo 'application logic'; exit();
+              $method = strtolower($_SERVER['REQUEST_METHOD']);
+              switch($this->u[1]) {
+                case '':
+                  switch($method) {
+                    case 'get':
+                      echo 'application';
+                    break;
+                    case 'post':
+                      echo 'profile';
+                    break;
+                  }
+                break;
+                default:
+                  //authorization
+                  /*
+                  if($page_exists) {
+                    if($this->res) {
+                      if($this->a) {
+                        header('Content-type: application/json');
+                        if(array_key_exists('callback', $_GET) == TRUE) {
+                          $this->res=json_encode($this->res);
+                          print $_GET['callback'].'('.$this->utf8ize($this->res).')'; 
+                        }else{
+                          echo json_encode($this->utf8ize($this->res));
+                        }
+                        exit();
+                      }
+                    }else{
+                      http_response_code(400);
+                      exit();
+                    }
+                  }else{
+                    http_response_code(404);
+                    exit();
+                  }
+                  */
+                break;
+              }
+              exit();
             }
           }
         }
