@@ -1,7 +1,7 @@
 server {
   server_name default localhost;
   listen 80 default_server;
-  root /var/www/html/public;
+  root /var/www/html/pub;
   index index.php;
   location / {
     try_files $uri $uri/ /index.php?$query_string;

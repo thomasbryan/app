@@ -8,7 +8,6 @@ class app {
   }
   function __construct() {
     $this->debug();
-    date_default_timezone_set('America/Chicago');
     if(isset($_SERVER['HTTP_X_REQUESTED_WITH'])) { if($_SERVER['HTTP_X_REQUESTED_WITH']=='XMLHttpRequest') { $this->a = true; } }
     $this->u = explode('/',strtok($_SERVER['REQUEST_URI'],'?'));
     parse_str(file_get_contents("php://input"), $this->req);
@@ -17,8 +16,7 @@ class app {
       $this->dsn();
       if(isset($_COOKIE)) {
         if(isset($_COOKIE['app'])) {
-          $token = $_COOKIE['app'];
-          $shrapnel = explode('.',$token);
+          $shrapnel = explode('.',$_COOKIE['app']);
           if(count($shrapnel) == 2) {
             if($shrapnel[1] == base64_encode(hash_hmac('sha256',$shrapnel[0],$this->e['encryption']))) {
               //todo check expiration
@@ -32,11 +30,27 @@ class app {
               switch($first) {
                 case '':
                   switch($method) {
+                    case 'delete':
+                      //delete data
+                    break;
                     case 'get':
-                      echo 'application';
+                      $action = '';
+                      if(isset($_GET['action'])) $action = $_GET['action'];
+                      switch($action) {
+                        case '': require_once('../app.html'); break;
+                        case 'profile':
+                          //$user = $this->query('select name,email from `users` where user = ?',[$this->who->sub]);
+                          //get list of applications
+                          //get list of writable data 
+                          //get permission to create data
+                        break;
+                      }
                     break;
                     case 'post':
-                      echo 'profile';
+                      //create data
+                    break;
+                    case 'put':
+                      //create data / update meta
                     break;
                   }
                 break;
@@ -44,28 +58,7 @@ class app {
                   $last = '';
                   if(isset($this->u[2])) $last = $this->u[2];
                   //authorization
-                  /*
-                  if($page_exists) {
-                    if($this->res) {
-                      if($this->a) {
-                        header('Content-type: application/json');
-                        if(array_key_exists('callback', $_GET) == TRUE) {
-                          $this->res=json_encode($this->res);
-                          print $_GET['callback'].'('.$this->utf8ize($this->res).')'; 
-                        }else{
-                          echo json_encode($this->utf8ize($this->res));
-                        }
-                        exit();
-                      }
-                    }else{
-                      http_response_code(400);
-                      exit();
-                    }
-                  }else{
-                    http_response_code(404);
-                    exit();
-                  }
-                  */
+                  //http_response_code(400);
                 break;
               }
               exit();
@@ -105,27 +98,52 @@ class app {
                 $payload = base64_decode($shrapnel[1]);
                 $claim = json_decode($payload);
                 if(!empty($claim)) {
-                  //revise
-                  $email = $name = '';
-                  if(isset($claim->{$this->e['email']})) $email = $claim->{$this->e['email']};
-                  if(isset($claim->{$this->e['name']})) $name = $claim->{$this->e['name']};
-                  if(!empty($email)) {
-                    $users = $this->query('select user from users where email = ? limit 1',[$email]);
+                  $sub = false;
+                  if(isset($claim->{$this->e['sub']})) $sub = $claim->{$this->e['sub']};
+                  if($sub) {
+                    $users = $this->query('select user from users where sub = ? limit 1',[$sub]);
                     if(isset($users['res'])) {
-                      $sub = false;
+                      $user = false;
                       if(count($users['res']) == 1) {
-                        $sub = $users['res'][0]['user'];
+                        $user = $users['res'][0]['user'];
                       }else{
-                        //revise
-                        $new = $this->query('insert into `users` (user,email,name) values (uuid(),?,?)',[$email,$name]);
-                        $u = $this->query('select user from users where email = ? limit 1',[$email]);
-                        if(count($u['res']) == 1) {
-                          $sub = $u['res'][0]['user'];
+                        $email = $name = '';
+                        if(isset($this->e['email'])) {
+                          $email = $claim->{$this->e['email']};
+                        }else{
+                          $e = false;
+                          if(isset($claim->email)) $e = 'email';
+                          if($e) {
+                            $this->env('email',$e);
+                            $email = $claim->{$e};
+                          }else{
+                            foreach($claim as $k => $v) {
+                              if(filter_var($v,FILTER_VALIDATE_EMAIL)) {
+                                $this->env('email',$k);
+                                $email = $v;
+                                break;
+                              }
+                            }
+                          }
                         }
+                        if(isset($this->e['name'])) {
+                          $name = $claim->{$this->e['name']};
+                        }else{
+                          $n = false;
+                          if(isset($claim->nickname)) $n = 'nickname';
+                          if(isset($claim->name)) $n = 'name';
+                          if($n) {
+                            $this->env('name',$n);
+                            $name = $claim->{$n};
+                          }
+                        }
+                        $u = $this->query('select uuid() as user');
+                        $user = $u['res'][0]['user'];
+                        $this->query('insert into `users` (user,sub,email,name) values (?,?,?,?)',[$user,$sub,$email,$name]);
                       }
-                      if($sub) {
+                      if($user) {
                         $exp = time() + 86400;
-                        $who = base64_encode(json_encode(['exp'=>$exp,'sub'=>$sub]));
+                        $who = base64_encode(json_encode(['exp'=>$exp,'sub'=>$user]));
                         setcookie('app',$who.'.'.base64_encode(hash_hmac('sha256',$who,$this->e['encryption'])),$exp,'/');
                         setcookie('state','',0,'/');
                         header('Location: '.$this->e['url']);
@@ -133,7 +151,6 @@ class app {
                       }
                     }
                   }
-
                 }
               }
             }
@@ -176,12 +193,9 @@ class app {
               if(isset($json->token_endpoint)) $toke = $json->token_endpoint;
               if($rize && $toke) {
                 if(in_array('code',$json->response_types_supported)) {
-                  //revise
-                  $email = $name = false;
-                  if(in_array('email',$json->claims_supported)) $email = 'email';
-                  if(in_array('nickname',$json->claims_supported)) $name = 'nickname';
-                  if(in_array('name',$json->claims_supported)) $name = 'name';
-                  if($email && $name) {
+                  $sub = false;
+                  if(in_array('sub',$json->claims_supported)) $sub = 'sub';
+                  if($sub) {
                     touch('../.env');
                     $this->env('auth',$auth);
                     $this->env('url',$url);
@@ -190,8 +204,7 @@ class app {
                     $this->env('scopes',$scopes);
                     $this->env('rize',$rize);
                     $this->env('toke',$toke);
-                    $this->env('email',$email);
-                    $this->env('name',$name);
+                    $this->env('sub',$sub);
                     $this->env('db',$db);
                     $this->env('user',$user);
                     $this->env('pass',$pass);
@@ -202,7 +215,7 @@ class app {
                     $db = $this->query('CREATE DATABASE IF NOT EXISTS `'.$this->e['db'].'`');
                     if(!isset($db['err'])) {
                       $this->dsn();
-                      $this->query('CREATE TABLE IF NOT EXISTS `users` (`user` char(36) NOT NULL,`email` varchar(255) NOT NULL,`name` varchar(100) NOT NULL,`admin` int(11) NOT NULL DEFAULT 0,PRIMARY KEY (`user`), UNIQUE KEY `users_email_unique` (`email`))');
+                      $this->query('CREATE TABLE IF NOT EXISTS `users` (`user` char(36) NOT NULL,`sub` varchar(255) NOT NULL,`email` varchar(255) NOT NULL,`name` varchar(100) NOT NULL,`admin` int(11) NOT NULL DEFAULT 0,PRIMARY KEY (`user`), UNIQUE KEY `users_sub_unique` (`sub`))');
                       $this->query('CREATE TABLE IF NOT EXISTS `roles` (`role` char(36) NOT NULL,`name` varchar(100) NOT NULL,PRIMARY KEY (`role`),UNIQUE KEY `roles_name_unique` (`name`))');
                       $this->query('CREATE TABLE IF NOT EXISTS `perms` (`perm` char(36) NOT NULL,`name` varchar(100) NOT NULL,PRIMARY KEY (`perm`),UNIQUE KEY `perms_name_unique` (`name`))');
                       $this->query('CREATE TABLE IF NOT EXISTS `usros` (`user` char(36) NOT NULL,`role` char(36) NOT NULL,KEY `usros_user_foreign` (`user`),KEY `usros_role_foreign` (`role`),CONSTRAINT `usros_role_foreign` FOREIGN KEY (`role`) REFERENCES `roles` (`role`) ON DELETE CASCADE,CONSTRAINT `usros_user_foreign` FOREIGN KEY (`user`) REFERENCES `users` (`user`) ON DELETE CASCADE)');
@@ -218,7 +231,7 @@ class app {
               }
             }
           }
-        } if(empty($url)) $url = $this->callback(); ?><!DOCTYPE html><html><head><title>App</title><style>body{font-family:arial;}div{margin-bottom:1em;clear:both;float:right;}form{margin:auto;width:400px;}label{font-weight:bold;padding-right:2em;}input,button{padding:6px 12px;color:#555;background-color:#fff;background-image:none;border:1px solid #ccc;border-radius:4px;box-shadow:inset 0 1px 1px rgba(0,0,0,.075);box-sizing:border-box;}button{background:#0063ce;color:#fff;font-weight:bold;width:195px;}</style></head><body><form method="POST"><div><label>Provider URL</label><input type="url" name="auth" value="<?= $auth ?>" required /></div><div><label>Callback URL</label><input type="url" name="url" value="<?= $url ?>" required /></div><div><label>Client ID</label><input type="text" name="id" value="<?= $id ?>" required /></div><div><label>Client Secret</label><input type="text" name="secret" value="<?= $secret ?>" required /></div><div><label>Scope</label><input type="text" name="scopes" value="<?= $scopes ?>" required /></div><div><label>Database Name</label><input type="text" name="db" value="<?= $db ?>" required /></div><div><label>User Name</label><input type="text" name="user" value="<?= $user ?>" required /></div><div><label>Password</label><input type="text" name="pass" value="<?= $pass ?>" required /></div><div><label>Database Host</label><input type="text" name="host" value="<?= $host ?>" required /></div><div><label>Encryption Key</label><input type="text" name="key" value="<?= $key ?>" required /></div><div><button type="submit">Install Application</button></div></form></body></html><?php
+        } if(empty($url)) $url = $this->callback(); ?><!DOCTYPE html><html><head><title>App</title><style>body{font-family:arial;}div{margin-bottom:1em;clear:both;float:right;}form{margin:auto;padding-top:2em;width:400px;}label{font-weight:bold;padding-right:2em;}input,button{padding:6px 12px;color:#555;background-color:#fff;background-image:none;border:1px solid #ccc;border-radius:4px;box-shadow:inset 0 1px 1px rgba(0,0,0,.075);box-sizing:border-box;}button{background:#0063ce;border-color:#fff;color:#fff;font-weight:bold;width:195px;}</style></head><body><form method="POST"><div><label>Provider URL</label><input type="url" name="auth" value="<?= $auth ?>" required /></div><div><label>Callback URL</label><input type="url" name="url" value="<?= $url ?>" required /></div><div><label>Client ID</label><input type="text" name="id" value="<?= $id ?>" required /></div><div><label>Client Secret</label><input type="text" name="secret" value="<?= $secret ?>" required /></div><div><label>Scope</label><input type="text" name="scopes" value="<?= $scopes ?>" required /></div><div><label>Database Name</label><input type="text" name="db" value="<?= $db ?>" required /></div><div><label>User Name</label><input type="text" name="user" value="<?= $user ?>" required /></div><div><label>Password</label><input type="text" name="pass" value="<?= $pass ?>" required /></div><div><label>Database Host</label><input type="text" name="host" value="<?= $host ?>" required /></div><div><label>Encryption Key</label><input type="text" name="key" value="<?= $key ?>" required /></div><div><button type="submit">Install Application</button></div></form></body></html><?php
       }else{
         echo 'Unable to write configuration file';exit();
       }
@@ -323,6 +336,15 @@ class app {
       $res .= $dic[rand(0,61)];
     }
     return $res;
+  }
+  private function json($d=false) {
+    header('Content-type: application/json; charset=utf-8');
+    if(array_key_exists('callback', $_GET) == TRUE){
+      $d=json_encode($this->utf8ize($d));
+      print $_GET['callback']."(".$d.")"; 
+    }else{
+      echo json_encode($this->utf8ize($d));
+    }
   }
   private function utf8ize($d) {
     if(is_array($d)) {

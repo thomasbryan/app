@@ -16,7 +16,7 @@ services:
     container_name: app
     image: app:latest
     volumes: 
-      - ./:/var/www/html/public
+      - ./html/:/var/www/html
     ports:
      - "8888:80"
 volumes:

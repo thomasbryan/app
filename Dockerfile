@@ -6,7 +6,7 @@ RUN docker-php-ext-install pdo_mysql
 COPY zz-docker.conf /usr/local/etc/php-fpm.d/
 COPY default /etc/nginx/sites-enabled/
 COPY supervisord.conf /etc/supervisor/conf.d/
-COPY index.php /var/www/html/public/
+COPY html /var/www/
 RUN chown -R www-data /var/www/html/
 CMD ["/usr/bin/supervisord"]
 EXPOSE 80
