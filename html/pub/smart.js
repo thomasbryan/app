@@ -44,13 +44,13 @@ function ajax(r) {
     url: r.au,
     data: r.ad,
   }).done(function(d) {
-    if($(r.dd).length && (r.dg!==undefined && r.dt!==undefined)) {
+    if($(r.dd).length && r.dt!==undefined) {
       tpl({"a":r.da,"d":r.dd,"g":r.dg,"t":r.dt,"r":d,"m":r.dm});
     }else{
       msg(true,d);
     }
   }).fail(function(f) {
-    if($(r.fd).length && (r.fg!==undefined && r.ft!==undefined)) {
+    if($(r.fd).length && r.ft!==undefined) {
       tpl({"a":r.fa,"d":r.fd,"g":r.fg,"t":r.ft,"r":f,"m":r.fm});
     }else{
       msg(false,f.statusText);

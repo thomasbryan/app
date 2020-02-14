@@ -31,7 +31,9 @@ class app {
                 case '':
                   switch($method) {
                     case 'delete':
+                      //check permission
                       //delete data
+                      //update meta
                     break;
                     case 'get':
                       $action = '';
@@ -43,14 +45,29 @@ class app {
                           //get list of applications
                           //get list of writable data 
                           //get permission to create data
+                          if($this->query('select true from `users` where admin = 1 and user = ?',[$this->who->sub],true)) $this->res['create'] = true;
+                          $this->json($this->res);
+                        break;
+                        case 'install':
+                          $admins = $this->query('select user from `users` where admin = 1');
+                          if(isset($admins['res'])) {
+                            if(count($admins['res']) == 0) {
+                              $this->query('update `users` set admin = 1 where user = ?',[$this->who->sub]);
+                            }
+                          }
                         break;
                       }
                     break;
                     case 'post':
+                      //check permission
+                      //check that does not exist
                       //create data
+                      //create meta
                     break;
                     case 'put':
-                      //create data / update meta
+                      //check permission
+                      //create data 
+                      //update meta
                     break;
                   }
                 break;
@@ -171,6 +188,8 @@ class app {
           exit();
         }
       }
+      //http_response_code(401);
+      //exit();
     }else{
       if(is_writable(dirname('..'))) { 
         $auth = $url = $id = $secret = $scopes = $db = $user = $pass = $host = $key = '';
@@ -271,7 +290,7 @@ class app {
     return $res;
     //more comprehensive return status. 
   }
-  private function query($query = '', $execute = []) {
+  private function query($query = '', $execute = [], $single = false) {
     $res = [];
     try {
       $db = new PDO($this->dsn,$this->user,$this->pass);
@@ -290,7 +309,11 @@ class app {
     if($last) {
       $res['id'] = $last;
     }else{
-      $res['res'] = $statement->fetchAll(PDO::FETCH_ASSOC);
+      if($single) {
+        $res = $statement->fetch(PDO::FETCH_ASSOC);
+      }else{
+        $res['res'] = $statement->fetchAll(PDO::FETCH_ASSOC);
+      }
     }
     return $res;
   }
@@ -338,6 +361,7 @@ class app {
     return $res;
   }
   private function json($d=false) {
+    //revise
     header('Content-type: application/json; charset=utf-8');
     if(array_key_exists('callback', $_GET) == TRUE){
       $d=json_encode($this->utf8ize($d));
