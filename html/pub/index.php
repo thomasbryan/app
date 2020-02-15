@@ -45,14 +45,14 @@ class app {
                           //get list of applications
                           //get list of writable data 
                           //get permission to create data
-                          if($this->query('select true from `users` where admin = 1 and user = ?',[$this->who->sub],true)) $this->res['create'] = true;
+                          if($this->query('select true from `users` where admin ? 1 and user = ?',[$this->who->sub],true)) $this->res['create'] = true;
                           $this->json($this->res);
                         break;
                         case 'install':
-                          $admins = $this->query('select user from `users` where admin = 1');
+                          $admins = $this->query('select user from `users` where admin = 255');
                           if(isset($admins['res'])) {
                             if(count($admins['res']) == 0) {
-                              $this->query('update `users` set admin = 1 where user = ?',[$this->who->sub]);
+                              $this->query('update `users` set admin = 255 where user = ?',[$this->who->sub]);
                             }
                           }
                         break;
@@ -231,10 +231,10 @@ class app {
                     $this->env('key',$key);
                     $this->e();
                     $this->dsn(false);
-                    $db = $this->query('CREATE DATABASE IF NOT EXISTS `'.$this->e['db'].'`');
-                    if(!isset($db['err'])) {
+                    $create = $this->query('CREATE DATABASE IF NOT EXISTS `'.$this->e['db'].'`');
+                    if(!isset($create['err'])) {
                       $this->dsn();
-                      $this->query('CREATE TABLE IF NOT EXISTS `users` (`user` char(36) NOT NULL,`sub` varchar(255) NOT NULL,`email` varchar(255) NOT NULL,`name` varchar(100) NOT NULL,`admin` int(11) NOT NULL DEFAULT 0,PRIMARY KEY (`user`), UNIQUE KEY `users_sub_unique` (`sub`))');
+                      $this->query('CREATE TABLE IF NOT EXISTS `users` (`user` char(36) NOT NULL,`sub` varchar(255) NOT NULL,`email` varchar(255) NOT NULL,`name` varchar(100) NOT NULL,`admin` tinyint(4) UNSIGNED NOT NULL DEFAULT 0,PRIMARY KEY (`user`), UNIQUE KEY `users_sub_unique` (`sub`))');
                       $this->query('CREATE TABLE IF NOT EXISTS `roles` (`role` char(36) NOT NULL,`name` varchar(100) NOT NULL,PRIMARY KEY (`role`),UNIQUE KEY `roles_name_unique` (`name`))');
                       $this->query('CREATE TABLE IF NOT EXISTS `perms` (`perm` char(36) NOT NULL,`name` varchar(100) NOT NULL,PRIMARY KEY (`perm`),UNIQUE KEY `perms_name_unique` (`name`))');
                       $this->query('CREATE TABLE IF NOT EXISTS `usros` (`user` char(36) NOT NULL,`role` char(36) NOT NULL,KEY `usros_user_foreign` (`user`),KEY `usros_role_foreign` (`role`),CONSTRAINT `usros_role_foreign` FOREIGN KEY (`role`) REFERENCES `roles` (`role`) ON DELETE CASCADE,CONSTRAINT `usros_user_foreign` FOREIGN KEY (`user`) REFERENCES `users` (`user`) ON DELETE CASCADE)');
@@ -250,7 +250,7 @@ class app {
               }
             }
           }
-        } if(empty($url)) $url = $this->callback(); ?><!DOCTYPE html><html><head><title>App</title><style>body{font-family:arial;}div{margin-bottom:1em;clear:both;float:right;}form{margin:auto;padding-top:2em;width:400px;}label{font-weight:bold;padding-right:2em;}input,button{padding:6px 12px;color:#555;background-color:#fff;background-image:none;border:1px solid #ccc;border-radius:4px;box-shadow:inset 0 1px 1px rgba(0,0,0,.075);box-sizing:border-box;}button{background:#0063ce;border-color:#fff;color:#fff;font-weight:bold;width:195px;}</style></head><body><form method="POST"><div><label>Provider URL</label><input type="url" name="auth" value="<?= $auth ?>" required /></div><div><label>Callback URL</label><input type="url" name="url" value="<?= $url ?>" required /></div><div><label>Client ID</label><input type="text" name="id" value="<?= $id ?>" required /></div><div><label>Client Secret</label><input type="text" name="secret" value="<?= $secret ?>" required /></div><div><label>Scope</label><input type="text" name="scopes" value="<?= $scopes ?>" required /></div><div><label>Database Name</label><input type="text" name="db" value="<?= $db ?>" required /></div><div><label>User Name</label><input type="text" name="user" value="<?= $user ?>" required /></div><div><label>Password</label><input type="text" name="pass" value="<?= $pass ?>" required /></div><div><label>Database Host</label><input type="text" name="host" value="<?= $host ?>" required /></div><div><label>Encryption Key</label><input type="text" name="key" value="<?= $key ?>" required /></div><div><button type="submit">Install Application</button></div></form></body></html><?php
+        } if(empty($url)) $url = $this->callback(); ?><!DOCTYPE html><html><head><title>App</title><style>body{font-family:arial;}div{margin-bottom:1em;clear:both;float:right;}form{margin:auto;padding-top:2em;width:400px;}label{font-weight:bold;padding-right:2em;}input,button{padding:6px 12px;color:#555;background-color:#fff;background-image:none;border:1px solid #ccc;border-radius:4px;box-shadow:inset 0 1px 1px rgba(0,0,0,.075);box-sizing:border-box;}button{background:#0063ce;border-color:#fff;color:#fff;font-weight:bold;width:195px;}</style></head><body><form method="POST"><div><label>Provider URL</label><input type="url" name="auth" value="<?= $auth ?>" required /></div><div><label>Callback URL</label><input type="url" name="url" value="<?= $url ?>" required /></div><div><label>Client ID</label><input type="text" name="id" value="<?= $id ?>" required /></div><div><label>Client Secret</label><input type="text" name="secret" value="<?= $secret ?>" required /></div><div><label>Scope</label><input type="text" name="scopes" value="<?= $scopes ?>" required /></div><div><label>Database Name</label><input type="text" name="db" value="<?= $db ?>" required /></div><div><label>User Name</label><input type="text" name="user" value="<?= $user ?>" required /></div><div><label>Password</label><input type="text" name="pass" value="<?= $pass ?>" required /></div><div><label>Database Host</label><input type="text" name="host" value="<?= $host ?>" required /></div><div><label>Encryption Key</label><input type="text" name="key" min="8" value="<?= $key ?>" required /></div><div><button type="submit">Install Application</button></div></form></body></html><?php
       }else{
         echo 'Unable to write configuration file';exit();
       }
@@ -385,17 +385,18 @@ class app {
     if(file_exists($env)) $this->e = parse_ini_file($env);
   }
   private function env($k,$v) {
-    $env = '../.env';
-    $str = file_get_contents($env);
+    $e = '../.env';
+    $s = file_get_contents($e);
+    $v = addslashes($v);
     if(isset($this->e[$k])) {
-      $old = $this->e[$k];
-      $str = str_replace("{$k}={$old}\n", "{$k}={$v}\n", $str);
+      $o = $this->e[$k];
+      $s = str_replace("{$k}=\"{$o}\"\n", "{$k}=\"{$v}\"\n", $s);
     }else{
-      $str .= "{$k}={$v}\n";
+      $s .= "{$k}=\"{$v}\"\n";
     }
-    $fp = fopen($env, 'w');
-    fwrite($fp, $str);
-    fclose($fp);
+    $f = fopen($e, 'w');
+    fwrite($f, $s);
+    fclose($f);
   }
   private function lumberjack($log=null,$lvl='info') {
     file_put_contents('../sys.log','['.date('Y-m-d H:i:s').'] ('.$lvl.') '.json_encode($log)."\n",FILE_APPEND);
