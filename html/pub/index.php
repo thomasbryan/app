@@ -36,23 +36,40 @@ class app {
                       //update meta
                     break;
                     case 'get':
-                      $action = '';
-                      if(isset($_GET['action'])) $action = $_GET['action'];
-                      switch($action) {
+                      $a = '';
+                      if(isset($_GET['a'])) $a = $_GET['a'];
+                      switch($a) {
                         case '': require_once('../app.html'); break;
-                        case 'profile':
+                        case 'p':
+                          $sql = 'select '.
+                          'space(a.user) as `create-data`'.
+                          ',space(b.user) as `user-manager`'.
+                          #',space(c.user) as `perm3`'.
+                          #',space(d.user) as `perm4`'.
+                          #',space(e.user) as `perm5`'.
+                          ' from users z '.
+                          'left join users a on z.admin & 1 '.
+                          'left join users b on z.admin & 2 '.
+                          #'left join users c on z.admin & 4 '.
+                          #'left join users d on z.admin & 8 '.
+                          #'left join users e on z.admin & 16 '.
+                          'where z.user = ?';
+                          $this->res['app'] = $this->query($sql,[$this->who->sub],true);
                           //$user = $this->query('select name,email from `users` where user = ?',[$this->who->sub]);
                           //get list of applications
                           //get list of writable data 
-                          //get permission to create data
-                          if($this->query('select true from `users` where admin ? 1 and user = ?',[$this->who->sub],true)) $this->res['create'] = true;
                           $this->json($this->res);
                         break;
-                        case 'install':
-                          $admins = $this->query('select user from `users` where admin = 255');
+                        case 'u':
+                          //check permission
+                          //paginated users / roles / perms
+                          $this->json($this->res);
+                        break;
+                        case 'i':
+                          $admins = $this->query('select user from `users` where admin = 18446744073709551615');
                           if(isset($admins['res'])) {
                             if(count($admins['res']) == 0) {
-                              $this->query('update `users` set admin = 255 where user = ?',[$this->who->sub]);
+                              $this->query('update `users` set admin = 18446744073709551615 where user = ?',[$this->who->sub]);
                             }
                           }
                         break;
