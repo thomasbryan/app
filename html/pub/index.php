@@ -234,7 +234,7 @@ class app {
                     $create = $this->query('CREATE DATABASE IF NOT EXISTS `'.$this->e['db'].'`');
                     if(!isset($create['err'])) {
                       $this->dsn();
-                      $this->query('CREATE TABLE IF NOT EXISTS `users` (`user` char(36) NOT NULL,`sub` varchar(255) NOT NULL,`email` varchar(255) NOT NULL,`name` varchar(100) NOT NULL,`admin` tinyint(4) UNSIGNED NOT NULL DEFAULT 0,PRIMARY KEY (`user`), UNIQUE KEY `users_sub_unique` (`sub`))');
+                      $this->query('CREATE TABLE IF NOT EXISTS `users` (`user` char(36) NOT NULL,`sub` varchar(255) NOT NULL,`email` varchar(255) NOT NULL,`name` varchar(100) NOT NULL,`admin` bigint(20) UNSIGNED NOT NULL DEFAULT 0,PRIMARY KEY (`user`), UNIQUE KEY `users_sub_unique` (`sub`))');
                       $this->query('CREATE TABLE IF NOT EXISTS `roles` (`role` char(36) NOT NULL,`name` varchar(100) NOT NULL,PRIMARY KEY (`role`),UNIQUE KEY `roles_name_unique` (`name`))');
                       $this->query('CREATE TABLE IF NOT EXISTS `perms` (`perm` char(36) NOT NULL,`name` varchar(100) NOT NULL,PRIMARY KEY (`perm`),UNIQUE KEY `perms_name_unique` (`name`))');
                       $this->query('CREATE TABLE IF NOT EXISTS `usros` (`user` char(36) NOT NULL,`role` char(36) NOT NULL,KEY `usros_user_foreign` (`user`),KEY `usros_role_foreign` (`role`),CONSTRAINT `usros_role_foreign` FOREIGN KEY (`role`) REFERENCES `roles` (`role`) ON DELETE CASCADE,CONSTRAINT `usros_user_foreign` FOREIGN KEY (`user`) REFERENCES `users` (`user`) ON DELETE CASCADE)');
