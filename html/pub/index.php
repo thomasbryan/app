@@ -39,7 +39,7 @@ class app {
                       $a = '';
                       if(isset($_GET['a'])) $a = $_GET['a'];
                       switch($a) {
-                        case '': require_once('../app.html'); break;
+                        case '': require_once('../app.html'); exit(); break;
                         case 'p':
                           $sql = 'select '.
                           'space(a.user) as `create-data`'.
@@ -58,12 +58,27 @@ class app {
                           //$user = $this->query('select name,email from `users` where user = ?',[$this->who->sub]);
                           //get list of applications
                           //get list of writable data 
-                          $this->json($this->res);
                         break;
                         case 'u':
-                          //check permission
-                          //paginated users / roles / perms
-                          $this->json($this->res);
+                          if($this->query('select space(1) as perm from users where admin % 512 and user = ?',[$this->who->sub],true)) {
+                            $r = '';
+                            if(isset($_GET['r'])) $r = $_GET['r'];
+                            $p = '0';
+                            if(isset($_GET['p'])) $p = $_GET['p'];
+                            $q = '';
+                            if(isset($_GET['q'])) $q = $_GET['q'];
+                            //paginated users / roles / perms
+                            switch($r) {
+                              case 'u':
+                              break;
+                              case 'r':
+                              break;
+                              case 'p':
+                              break;
+                              case '':
+                              break;
+                            }
+                          }
                         break;
                         case 'i':
                           $admins = $this->query('select user from `users` where admin = 18446744073709551615');
@@ -95,6 +110,7 @@ class app {
                   //http_response_code(400);
                 break;
               }
+              $this->json();
               exit();
             }
           }
@@ -188,8 +204,6 @@ class app {
                 }
               }
             }
-            //http_response_code(401);
-            exit('Unable to process this request');
           }else{
             if(isset($_COOKIE['state'])) {
               $state = $_COOKIE['state'];
@@ -200,13 +214,9 @@ class app {
             header('Location: '.$this->e['rize'].'?state='.$state.'&scope='.$this->e['scopes'].'&response_type=code&client_id='.$this->e['id'].'&redirect_uri='.$this->e['url']);
             exit();
           }
-        }else{
-          http_response_code(401);
-          exit();
         }
+        http_response_code(401);
       }
-      //http_response_code(401);
-      //exit();
     }else{
       if(is_writable(dirname('..'))) { 
         $auth = $url = $id = $secret = $scopes = $db = $user = $pass = $host = $key = '';
@@ -272,6 +282,7 @@ class app {
         echo 'Unable to write configuration file';exit();
       }
     }
+    exit();
   }
   //curl();
   private function http($json) {
@@ -377,14 +388,17 @@ class app {
     }
     return $res;
   }
-  private function json($d=false) {
-    //revise
-    header('Content-type: application/json; charset=utf-8');
-    if(array_key_exists('callback', $_GET) == TRUE){
-      $d=json_encode($this->utf8ize($d));
-      print $_GET['callback']."(".$d.")"; 
+  private function json() {
+    if($this->res) {
+      header('Content-type: application/json; charset=utf-8');
+      if(array_key_exists('callback', $_GET) == TRUE){
+        $this->res = json_encode($this->utf8ize($this->res));
+        print $_GET['callback']."(".$this->res.")"; 
+      }else{
+        echo json_encode($this->utf8ize($this->res));
+      }
     }else{
-      echo json_encode($this->utf8ize($d));
+      http_response_code(400);
     }
   }
   private function utf8ize($d) {
